@@ -24,6 +24,9 @@ data/processed/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 
+# Exception: allow docs/data.json for GitHub Pages
+!docs/data.json
+
 # Secrets and credentials
 .env
 *.key
