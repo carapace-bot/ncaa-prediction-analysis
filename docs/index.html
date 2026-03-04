@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NCAA Tournament Predictions</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #0f1419;
+            color: #e1e8ed;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            margin-bottom: 40px;
+            border-bottom: 1px solid #38444d;
+            padding-bottom: 20px;
+        }
+        
+        h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+        
+        .subtitle {
+            color: #657786;
+            font-size: 14px;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-box {
+            background: #192734;
+            border: 1px solid #38444d;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        
+        .stat-label {
+            color: #657786;
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        
+        .teams-grid {
+            display: grid;
+            gap: 12px;
+        }
+        
+        .team-card {
+            background: #192734;
+            border: 1px solid #38444d;
+            padding: 16px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: border-color 0.2s;
+        }
+        
+        .team-card:hover {
+            border-color: #1da1f2;
+        }
+        
+        .team-info {
+            flex: 1;
+        }
+        
+        .team-name {
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 4px;
+        }
+        
+        .team-rank {
+            color: #657786;
+            font-size: 12px;
+        }
+        
+        .probability-container {
+            flex: 1;
+            max-width: 300px;
+            margin: 0 20px;
+        }
+        
+        .probability-bar {
+            background: #38444d;
+            height: 24px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 4px;
+        }
+        
+        .probability-fill {
+            background: linear-gradient(90deg, #1da1f2, #17bf63);
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 11px;
+            font-weight: bold;
+            transition: width 0.3s ease;
+        }
+        
+        .probability-value {
+            font-weight: 600;
+            min-width: 60px;
+            text-align: right;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #657786;
+        }
+        
+        .error {
+            background: #330000;
+            border: 1px solid #cc0000;
+            color: #ff6666;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .timestamp {
+            color: #657786;
+            font-size: 12px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #38444d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>NCAA Tournament Predictions</h1>
+            <p class="subtitle">Data-driven analysis of championship odds from 10,000 Monte Carlo simulations</p>
+        </header>
+        
+        <div class="stats">
+            <div class="stat-box">
+                <div class="stat-label">Teams Analyzed</div>
+                <div class="stat-value" id="teamCount">-</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Simulations Run</div>
+                <div class="stat-value" id="simCount">10,000</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Favorite Odds</div>
+                <div class="stat-value" id="favOdds">-</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Field Spread</div>
+                <div class="stat-value" id="fieldSpread">-</div>
+            </div>
+        </div>
+        
+        <div id="teamsContainer" class="teams-grid">
+            <div class="loading">Loading analysis data...</div>
+        </div>
+        
+        <div class="timestamp">
+            <strong>Last Updated:</strong> <span id="timestamp">-</span>
+            <br><strong>Auto-refresh:</strong> Every 60 seconds
+        </div>
+    </div>
+    
+    <script>
+        async function loadData() {
+            try {
+                const response = await fetch('./data.json');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                renderDashboard(data);
+            } catch (error) {
+                console.error('Error loading data:', error);
+                document.getElementById('teamsContainer').innerHTML = 
+                    `<div class="error">Error loading analysis data. Please refresh the page.</div>`;
+            }
+        }
+        
+        function renderDashboard(data) {
+            const teams = data.teams || [];
+            const metadata = data.metadata || {};
+            
+            // Update stats
+            document.getElementById('teamCount').textContent = teams.length;
+            
+            if (teams.length > 0) {
+                document.getElementById('favOdds').textContent = (teams[0].probability * 100).toFixed(1) + '%';
+                const minOdds = Math.min(...teams.map(t => t.probability));
+                const maxOdds = Math.max(...teams.map(t => t.probability));
+                document.getElementById('fieldSpread').textContent = 
+                    ((maxOdds - minOdds) * 100).toFixed(1) + '%';
+            }
+            
+            // Update timestamp
+            document.getElementById('timestamp').textContent = 
+                metadata.timestamp || new Date().toLocaleString();
+            
+            // Render team cards
+            const container = document.getElementById('teamsContainer');
+            container.innerHTML = '';
+            
+            teams.forEach((team, index) => {
+                const probability = team.probability * 100;
+                const card = document.createElement('div');
+                card.className = 'team-card';
+                card.innerHTML = `
+                    <div class="team-info">
+                        <div class="team-name">${index + 1}. ${team.name}</div>
+                        <div class="team-rank">Rating: ${(team.rating || 0).toFixed(2)}</div>
+                    </div>
+                    <div class="probability-container">
+                        <div class="probability-bar">
+                            <div class="probability-fill" style="width: ${probability}%">
+                                ${probability > 5 ? probability.toFixed(2) + '%' : ''}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="probability-value">${probability.toFixed(2)}%</div>
+                `;
+                container.appendChild(card);
+            });
+        }
+        
+        // Load data on page load
+        loadData();
+        
+        // Auto-refresh every 60 seconds
+        setInterval(loadData, 60000);
+    </script>
+</body>
+</html>
