@@ -19,12 +19,13 @@ class TournamentSimulator:
     
     def calculate_win_probability(self, team1_rating, team2_rating):
         """
-        Calculate P(team1 beats team2) using logistic model
-        Based on rating difference
+        Calculate P(team1 beats team2) using logistic model.
+        Ratings are on 0-1 scale (not ELO 1500 scale).
         """
         rating_diff = team1_rating - team2_rating
-        # Scale factor: 400 is standard in rating systems
-        prob = 1.0 / (1.0 + 10.0 ** (-rating_diff / 400.0))
+        # For 0-1 scale ratings, use a steeper curve
+        # A 0.1 rating difference ~ 65% win probability
+        prob = 1.0 / (1.0 + 10.0 ** (-rating_diff * 8.0))
         return prob
     
     def simulate_game(self, team1, team2):
@@ -42,54 +43,46 @@ class TournamentSimulator:
         else:
             return team2
     
-    def simulate_tournament(self, bracket):
+    def simulate_tournament(self, teams):
         """
         Simulate a single tournament run.
-        bracket: list of lists representing tournament structure
-        bracket[0] = 16 teams (sweet 16)
-        bracket[1] = 8 teams (elite 8)
-        etc.
-        Returns final champion
+        teams: flat list of teams in bracket order (matchups are adjacent pairs).
+        Plays through rounds until one champion remains.
+        Returns final champion.
         """
-        current_round = bracket[0].copy()
+        current_round = list(teams)
         
-        # Play through each round
-        for round_num in range(1, len(bracket)):
+        while len(current_round) > 1:
             next_round = []
-            
-            # Pair up teams and simulate games
             for i in range(0, len(current_round), 2):
                 if i + 1 < len(current_round):
-                    team1 = current_round[i]
-                    team2 = current_round[i + 1]
-                    winner = self.simulate_game(team1, team2)
+                    winner = self.simulate_game(current_round[i], current_round[i + 1])
                     next_round.append(winner)
                 else:
+                    # Odd team gets a bye
                     next_round.append(current_round[i])
-            
             current_round = next_round
         
-        # Champion is final remaining team
         return current_round[0] if current_round else None
     
-    def run_simulations(self, bracket, num_simulations=10000):
+    def run_simulations(self, teams, num_simulations=10000):
         """
         Run multiple tournament simulations and track outcomes.
         
-        bracket: tournament structure (list of lists)
+        teams: flat list of teams in bracket order
         num_simulations: number of times to run tournament
         
         Returns: dict with probability of each team winning championship
         """
         champion_counts = defaultdict(int)
         
-        logger.info(f"Running {num_simulations} tournament simulations...")
+        logger.info(f"Running {num_simulations} tournament simulations with {len(teams)} teams...")
         
         for i in range(num_simulations):
             if (i + 1) % 2000 == 0:
                 logger.info(f"  Completed {i + 1}/{num_simulations}")
             
-            champion = self.simulate_tournament(bracket)
+            champion = self.simulate_tournament(teams)
             if champion:
                 champion_counts[champion] += 1
         
@@ -107,28 +100,24 @@ class TournamentSimulator:
         
         return dict(sorted_odds)
     
-    def calculate_final_four_odds(self, bracket, num_simulations=10000):
-        """Calculate probability each team reaches Final Four"""
+    def calculate_final_four_odds(self, teams, num_simulations=10000):
+        """Calculate probability each team reaches Final Four (last 4 remaining)"""
         final_four_counts = defaultdict(int)
         
         for i in range(num_simulations):
-            current_round = bracket[0].copy()
+            current_round = list(teams)
             
-            # Simulate until we have 4 teams (Final Four)
-            for round_num in range(1, len(bracket) - 1):  # Stop before final
+            # Simulate until we have 4 or fewer teams
+            while len(current_round) > 4:
                 next_round = []
                 for j in range(0, len(current_round), 2):
                     if j + 1 < len(current_round):
-                        team1 = current_round[j]
-                        team2 = current_round[j + 1]
-                        winner = self.simulate_game(team1, team2)
+                        winner = self.simulate_game(current_round[j], current_round[j + 1])
                         next_round.append(winner)
                     else:
                         next_round.append(current_round[j])
-                
                 current_round = next_round
             
-            # Record which teams made Final Four
             for team in current_round:
                 final_four_counts[team] += 1
         
